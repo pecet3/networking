@@ -28,7 +28,7 @@ void print_err_exit(const char *fmt, ...)
 char *bin2hex(const unsigned char *input, size_t len)
 {
     char *result;
-    char *hexits = "012345678ABCDEF";
+    char *hexits = "0123456789ABCDEF";
 
     if (input == NULL || len <= 0)
     {
@@ -38,6 +38,7 @@ char *bin2hex(const unsigned char *input, size_t len)
     int resultlength = (len * 3) + 1;
 
     result = malloc(resultlength);
+    bzero(result, resultlength);
     for (int i = 0; i < len; i++)
     {
         result[i * 3] = hexits[input[i] >> 4];

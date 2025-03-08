@@ -5,9 +5,30 @@
 
 #define SA struct sockaddr
 
+char *extract_routenmethod(const char *input)
+{
+    if (input == NULL)
+        return NULL;
+
+    const char *first_space = strchr(input, ' ');
+    if (first_space == NULL)
+        return NULL;
+
+    const char *second_space = strchr(first_space + 1, ' ');
+    if (second_space == NULL)
+        return NULL;
+
+    size_t length = second_space - (input);
+
+    char *route = malloc(length + 1);
+
+    strncpy(route, input, length);
+    route[length + 1] = '\0';
+    return route;
+}
+
 int main(int argc, char **argv)
 {
-
     int listenfd, connfd, n;
     struct sockaddr_in servaddr;
     uint8_t buf[BUF_SIZE + 1];
@@ -29,7 +50,7 @@ int main(int argc, char **argv)
 
     while (1)
     {
-        printf("waiting for a connection on port %d\n", SERVER_PORT);
+        printf("> waiting for a connection on port %d\n", SERVER_PORT);
 
         fflush(stdout);
         connfd = accept(listenfd, (SA *)NULL, NULL);
@@ -37,7 +58,15 @@ int main(int argc, char **argv)
 
         while ((n = read(connfd, recvline, BUF_SIZE - 1)) > 0)
         {
-            fprintf(stdout, "\n%s\n\n%s", bin2hex(recvline, n), recvline);
+            char *route = extract_routenmethod((const char *)(recvline));
+
+            if (route != NULL)
+            {
+                printf("Extracted route: %s\n", route);
+                free(route); // Zwolnienie pamięci
+            }
+
+            fprintf(stdout, "\n%s\n", recvline);
 
             if (recvline[n - 1] == '\n')
                 break;
@@ -48,7 +77,7 @@ int main(int argc, char **argv)
         if (n < 0)
             print_err_exit("read err");
 
-        snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 200 OK\r\n\r\nHello");
+        snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 200 OK\r\n\r\n<html><b>test</b></html>");
 
         write(connfd, (char *)buf, strlen((char *)buf));
         close(connfd);
