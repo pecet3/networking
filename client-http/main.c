@@ -1,25 +1,9 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <stdarg.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <netdb.h>
-#include <string.h>
-#include <strings.h>
+#include "../common/common.h"
 
 #define SERVER_PORT 80
 #define BUF_SIZE 4096
 
 #define SA struct sockaddr
-
-void print_err_exit(const char *fmt, ...);
 
 int main(int argc, char **argv)
 {
@@ -80,29 +64,4 @@ int main(int argc, char **argv)
     }
     close(sockfd);
     exit(0);
-}
-
-void print_err_exit(const char *fmt, ...)
-{
-    int errno_save;
-    va_list ap;
-
-    // print to stdout
-    va_start(ap, fmt);
-    vfprintf(stdout, fmt, ap);
-    fprintf(stdout, "\n");
-    fflush(stdout);
-
-    // print out err msg if errno was set
-
-    if (errno_save != 0)
-    {
-        fprintf(stdout, "(errno = %d) : %s\n", errno_save, strerror(errno_save));
-        strerror(errno_save);
-        fprintf(stdout, "\n");
-        fflush(stdout);
-    }
-    va_end(ap);
-
-    exit(1);
 }

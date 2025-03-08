@@ -1,5 +1,10 @@
 {
   "files.associations": {
-    "types.h": "c"
+    "types.h": "c",
+    "unistd.h": "c",
+    "common.h": "c",
+    "socket.h": "c",
+    "errno.h": "c",
+    "fcntl.h": "c"
   }
 }
