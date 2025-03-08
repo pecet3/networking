@@ -15,6 +15,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <strings.h>
+#include <pthread.h>
 
 void print_err_exit(const char *fmt, ...);
 char *bin2hex(const unsigned char *input, size_t len);
