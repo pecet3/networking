@@ -4,7 +4,7 @@
 NUM_CONNECTIONS=100
 
 # Adres URL
-URL="http://localhost/file/main.c"
+URL="http://localhost/test"
 
 # Funkcja do wykonywania pojedynczego połączenia
 make_request() {

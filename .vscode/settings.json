@@ -6,6 +6,7 @@
     "socket.h": "c",
     "errno.h": "c",
     "fcntl.h": "c",
-    "string.h": "c"
+    "string.h": "c",
+    "strings.h": "c"
   }
 }

@@ -5,11 +5,60 @@
 #define SERVER_PORT 80
 #define BUF_SIZE 4096
 
-#define THREAD_POOL_SIZE 20
+#define THREAD_POOL_SIZE 3
 
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
+
+///// for thread pool ////////////
+
+struct queue_node
+{
+    struct queue_node *next;
+    int *client_socket;
+};
+typedef struct queue_node node_t;
+
+node_t *head = NULL;
+node_t *tail = NULL;
+void enqueue(int *client_socket)
+{
+    node_t *newnode = malloc(sizeof(node_t));
+    newnode->client_socket = client_socket;
+
+    if (tail == NULL)
+    {
+        head = newnode;
+    }
+    else
+    {
+        tail->next = newnode;
+    }
+    tail = newnode;
+}
+
+int *dequeue()
+{
+    if (head == NULL)
+    {
+        return NULL;
+    }
+    else
+    {
+        int *result = head->client_socket;
+        node_t *temp = head;
+        head = head->next;
+        if (head == NULL)
+        {
+            tail = NULL;
+        }
+        free(temp);
+        return result;
+    }
+}
+
+//////////////////////////////////////
 
 char *extract_routenmethod(const char *input)
 {
@@ -39,7 +88,7 @@ void *handle_conn(void *connfd_ptr)
 {
 
     int connfd = *((int *)connfd_ptr);
-    free(connfd_ptr); // Free the allocated memory for the socket
+    free(connfd_ptr);
 
     uint8_t buf[BUF_SIZE + 1];
     uint8_t recvline[BUF_SIZE];
@@ -113,11 +162,9 @@ void *thread_func(void *arg)
     {
         int *sock;
         pthread_mutex_lock(&mux);
-        sock = dequeue();
-        if (sock == NULL)
+        while ((sock = dequeue()) == NULL)
         {
             pthread_cond_wait(&condition_var, &mux);
-            sock = dequeue();
         }
         pthread_mutex_unlock(&mux);
 
@@ -130,29 +177,13 @@ void *thread_func(void *arg)
 
 int main(int argc, char **argv)
 {
-    int listenfd;
-
-    struct sockaddr_in servaddr;
 
     for (int i = 0; i < THREAD_POOL_SIZE; i++)
     {
         pthread_create(&thread_pool[i], NULL, thread_func, NULL);
     }
 
-    if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        print_err_exit("socket err");
-
-    bzero(&servaddr, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(SERVER_PORT);
-
-    if ((bind(listenfd, (SA *)&servaddr, sizeof(servaddr))) < 0)
-        print_err_exit("bind err");
-
-    if ((listen(listenfd, 10)) < 0)
-        print_err_exit("listen err");
-
+    int listenfd = setup_srv(SERVER_PORT, 10);
     printf(">Server is listening\n");
     while (1)
     {

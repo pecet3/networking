@@ -20,12 +20,7 @@
 void print_err_exit(const char *fmt, ...);
 char *bin2hex(const unsigned char *input, size_t len);
 
-struct queue_node
-{
-    struct queue_node *next;
-    int *client_socket;
-};
-typedef struct queue_node node_t;
+#define BUF_SIZE 4096
 
-void enqueue(int *client_socket);
-int *dequeue();
+int setup_srv(int port, int backlog);
+int accept_conn(int srv_socket);
