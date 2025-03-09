@@ -9,6 +9,8 @@
 
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t condition_var = PTHREAD_COND_INITIALIZER;
+
 char *extract_routenmethod(const char *input)
 {
     if (input == NULL)
@@ -109,8 +111,14 @@ void *thread_func(void *arg)
 {
     while (1)
     {
+        int *sock;
         pthread_mutex_lock(&mux);
-        int *sock = dequeue();
+        sock = dequeue();
+        if (sock == NULL)
+        {
+            pthread_cond_wait(&condition_var, &mux);
+            sock = dequeue();
+        }
         pthread_mutex_unlock(&mux);
 
         if (sock != NULL)
@@ -145,6 +153,7 @@ int main(int argc, char **argv)
     if ((listen(listenfd, 10)) < 0)
         print_err_exit("listen err");
 
+    printf(">Server is listening\n");
     while (1)
     {
         struct sockaddr_in addr;
@@ -163,6 +172,7 @@ int main(int argc, char **argv)
         *sock = connfd;
         pthread_mutex_lock(&mux);
         enqueue(sock);
+        pthread_cond_signal(&condition_var);
         pthread_mutex_unlock(&mux);
     }
 
