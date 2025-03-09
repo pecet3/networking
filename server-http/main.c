@@ -1,9 +1,14 @@
 #include "../common/common.h"
-#define SERVER_PORT 8080
-#define BUF_SIZE 4096
+#include <pthread.h>
 
 #define SA struct sockaddr
+#define SERVER_PORT 80
+#define BUF_SIZE 4096
 
+#define THREAD_POOL_SIZE 20
+
+pthread_t thread_pool[THREAD_POOL_SIZE];
+pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
 char *extract_routenmethod(const char *input)
 {
     if (input == NULL)
@@ -20,14 +25,20 @@ char *extract_routenmethod(const char *input)
     size_t length = second_space - (input);
 
     char *route = malloc(length + 1);
+    if (route == NULL)
+        return NULL;
 
     strncpy(route, input, length);
-    route[length + 1] = '\0';
+    route[length] = '\0'; // Correct null-termination
     return route;
 }
 
-void handle(int connfd)
+void *handle_conn(void *connfd_ptr)
 {
+
+    int connfd = *((int *)connfd_ptr);
+    free(connfd_ptr); // Free the allocated memory for the socket
+
     uint8_t buf[BUF_SIZE + 1];
     uint8_t recvline[BUF_SIZE];
 
@@ -46,26 +57,25 @@ void handle(int connfd)
                 snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 200 OK\r\n\r\n<html><b>index</b></html>");
                 write(connfd, (char *)buf, strlen((char *)buf));
             }
-            if (!strcmp(route, "GET /test"))
+            else if (!strcmp(route, "GET /test"))
             {
                 snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 200 OK\r\n\r\n<html><b>test</b></html>");
                 write(connfd, (char *)buf, strlen((char *)buf));
             }
-            if (!strcmp(route, "GET /test2"))
+            else if (!strcmp(route, "GET /test2"))
             {
                 snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 200 OK\r\n\r\n<html><b>test2</b></html>");
                 write(connfd, (char *)buf, strlen((char *)buf));
             }
-            if (!strncmp(route, "GET /file", 9))
-            // strstr - alternative
+            else if (!strncmp(route, "GET /file", 9))
             {
                 const char *path = route + 10;
                 printf("path: %s\n", path);
-
                 FILE *fp = fopen(path, "r");
                 if (fp == NULL)
                 {
                     snprintf((char *)buf, BUF_SIZE, "HTTP/1.0 404 Not Found\r\n\r\n<html><b>File not found</b></html>");
+                    write(connfd, (char *)buf, strlen((char *)buf));
                 }
                 else
                 {
@@ -81,14 +91,32 @@ void handle(int connfd)
                 }
             }
         }
+
         if (n < 0)
             print_err_exit("read err");
 
         if (recvline[n - 1] == '\n')
             break;
-        free(route);
 
         memset(recvline, 0, BUF_SIZE);
+        free(route);
+    }
+    close(connfd);
+    return NULL;
+}
+
+void *thread_func(void *arg)
+{
+    while (1)
+    {
+        pthread_mutex_lock(&mux);
+        int *sock = dequeue();
+        pthread_mutex_unlock(&mux);
+
+        if (sock != NULL)
+        {
+            handle_conn(sock);
+        }
     }
 }
 
@@ -97,6 +125,11 @@ int main(int argc, char **argv)
     int listenfd;
 
     struct sockaddr_in servaddr;
+
+    for (int i = 0; i < THREAD_POOL_SIZE; i++)
+    {
+        pthread_create(&thread_pool[i], NULL, thread_func, NULL);
+    }
 
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
         print_err_exit("socket err");
@@ -112,21 +145,27 @@ int main(int argc, char **argv)
     if ((listen(listenfd, 10)) < 0)
         print_err_exit("listen err");
 
-    int connfd;
-
     while (1)
     {
         struct sockaddr_in addr;
         socklen_t addr_len;
         char client_address[BUF_SIZE + 1];
-        connfd = accept(listenfd, (SA *)&addr, &addr_len);
+        int connfd = accept(listenfd, (SA *)&addr, &addr_len);
         inet_ntop(AF_INET, &addr.sin_addr, client_address, BUF_SIZE);
 
         printf("> client connected, ip: %s\n", client_address);
         fflush(stdout);
-        handle(connfd);
-        close(connfd);
+
+        // Allocate memory for the socket descriptor and pass it to the thread
+        int *sock = malloc(sizeof(int));
+        if (sock == NULL)
+            print_err_exit("malloc err");
+        *sock = connfd;
+        pthread_mutex_lock(&mux);
+        enqueue(sock);
+        pthread_mutex_unlock(&mux);
     }
 
-    exit(0);
+    close(listenfd);
+    return 0;
 }
